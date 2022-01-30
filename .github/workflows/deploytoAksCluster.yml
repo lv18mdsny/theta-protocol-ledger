@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: mxlcr01.azurecr.io
+        username: ${{ secrets.acr_mxlcr01_username }}
+        password: ${{ secrets.acr_mxlcr01_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/" -f  "Dockerfile" -t mxlcr01.azurecr.io/mxlabs:${{ github.sha }} --label dockerfile-path=Dockerfile
+        docker push mxlcr01.azurecr.io/mxlabs:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_mxlabs_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep mexth | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace mexth`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: mexth
+        container-registry-url: mxlcr01.azurecr.io
+        container-registry-username: ${{ secrets.acr_mxlcr01_username }}
+        container-registry-password: ${{ secrets.acr_mxlcr01_password }}
+        secret-name: mxlabsdockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: mexth
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          mxlcr01.azurecr.io/mxlabs:${{ github.sha }}
+        imagepullsecrets: |
+          mxlabsdockerauth
