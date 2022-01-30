@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "mxlabs-db98"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "mxlabs-db98"
+  template:
+    metadata:
+      labels:
+        app: "mxlabs-db98"
+    spec:
+      containers:
+        - name: "mxlabs-db98"
+          image: "mxlcr01.azurecr.io/mxlabs"
+          ports:
+          - containerPort: 28888
